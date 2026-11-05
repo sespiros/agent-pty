@@ -33,6 +33,28 @@ agent-pty job -- make release   # working while it runs, then done or error
 
 Outside tmux, when stdin is not a terminal, or with `AGENT_PTY=0`, `agent-pty` runs the command directly.
 
+## tmux status line
+
+`agent-pty` (and `notchify wrap --tmux-status`) write these window options:
+
+| option | value |
+|---|---|
+| `@agent_state` | `idle`, `working`, `blocked`, `done` or `error` |
+| `@agent_kind` | `permission`, `question` or `auth`, while blocked |
+| `@agent_msg` | the agent's one-line message |
+| `@agent_subagents` | child records still working or blocked (Claude Code reports one per subagent); unset when 0 |
+| `@agent_shells` | Claude Code background shells still running; unset when 0 |
+| `@agent_pty` | the relay's pid while it runs |
+
+Show them in front of each window name, for example in `~/.tmux.conf`:
+
+```tmux
+set -g window-status-format ' #{?#{==:#{@agent_state},working},#[fg=green]▶#[default] ,#{?#{==:#{@agent_state},blocked},#[fg=red]!#[default] ,#{?#{==:#{@agent_state},done},#[fg=blue]✓#[default] ,#{?#{==:#{@agent_state},error},#[fg=red]✗#[default] ,}}}}#{?#{>:#{@agent_subagents},0},» ,}#{?#{>:#{@agent_shells},0},◷ ,}#W '
+set -g window-status-current-format ' #{?#{==:#{@agent_state},working},#[fg=green]▶#[default] ,#{?#{==:#{@agent_state},blocked},#[fg=red]!#[default] ,#{?#{==:#{@agent_state},done},#[fg=blue]✓#[default] ,#{?#{==:#{@agent_state},error},#[fg=red]✗#[default] ,}}}}#{?#{>:#{@agent_subagents},0},» ,}#{?#{>:#{@agent_shells},0},◷ ,}#W '
+```
+
+Done and error stay after the agent exits, since the result is still unread; clear them with `tmux set -wu @agent_state`, or from a hook such as `session-window-changed` when the window is viewed.
+
 ## Dependencies
 
 [pst](https://github.com/adamvduke/pst) parses the reports and keeps the records.
