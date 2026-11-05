@@ -59,26 +59,12 @@ func stub(argv []string) int {
 			_ = syscall.Kill(-pid, s.(syscall.Signal))
 		}
 	}()
-	for {
-		var ws syscall.WaitStatus
-		if _, err := syscall.Wait4(pid, &ws, syscall.WUNTRACED, nil); err != nil {
-			if err == syscall.EINTR {
-				continue
-			}
-			return 0
-		}
-		switch {
-		case ws.Stopped():
-			_ = syscall.Kill(os.Getpid(), syscall.SIGSTOP)
-			_ = term.SetForeground(0, pid)
-			_ = syscall.Kill(-pid, syscall.SIGCONT)
-		case ws.Signaled():
-			sig := ws.Signal()
-			signal.Reset(sig)
-			_ = syscall.Kill(os.Getpid(), sig)
-			return 128 + int(sig)
-		default:
-			return ws.ExitStatus()
-		}
-	}
+	return await(pid, func() {
+		_ = syscall.Kill(os.Getpid(), syscall.SIGSTOP)
+		_ = term.SetForeground(0, pid)
+		_ = syscall.Kill(-pid, syscall.SIGCONT)
+	}, func(sig syscall.Signal) {
+		signal.Reset(sig)
+		_ = syscall.Kill(os.Getpid(), sig)
+	})
 }

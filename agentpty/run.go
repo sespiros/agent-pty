@@ -180,27 +180,13 @@ func Run(ctx context.Context, argv []string, observers ...Observer) (int, error)
 // agent was suspended), it gives the terminal back, stops this process too,
 // and resumes the stub when this process is continued.
 func (r *relay) wait(saved *syscall.Termios) int {
-	for {
-		var ws syscall.WaitStatus
-		if _, err := syscall.Wait4(r.stub, &ws, syscall.WUNTRACED, nil); err != nil {
-			if err == syscall.EINTR {
-				continue
-			}
-			return 0
-		}
-		switch {
-		case ws.Stopped():
-			_ = term.Set(0, saved)
-			_ = syscall.Kill(os.Getpid(), syscall.SIGSTOP)
-			_ = term.Set(0, term.Raw(saved))
-			term.CopySize(0, int(r.master.Fd()))
-			_ = syscall.Kill(-r.stub, syscall.SIGCONT)
-		case ws.Signaled():
-			return 128 + int(ws.Signal())
-		default:
-			return ws.ExitStatus()
-		}
-	}
+	return await(r.stub, func() {
+		_ = term.Set(0, saved)
+		_ = syscall.Kill(os.Getpid(), syscall.SIGSTOP)
+		_ = term.Set(0, term.Raw(saved))
+		term.CopySize(0, int(r.master.Fd()))
+		_ = syscall.Kill(-r.stub, syscall.SIGCONT)
+	}, nil)
 }
 
 func (r *relay) handle(data []byte) {

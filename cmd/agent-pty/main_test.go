@@ -304,3 +304,57 @@ func TestStatusIsANoopWithoutATerminalOrTmux(t *testing.T) {
 		t.Error("tmux was called")
 	}
 }
+
+// The agent stops itself as Ctrl-Z would; the relay must stop too, and
+// carry on when continued, as a job-control shell expects.
+func TestSuspendAndResume(t *testing.T) {
+	e := setup(t)
+	master, slave, err := term.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer master.Close()
+	cmd := exec.Command(bin, "/bin/sh", "-c", "echo start; kill -TSTP $$; echo resumed")
+	cmd.Env = e.env
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = slave, slave, slave
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true, Ctty: 0}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	slave.Close()
+	var out bytes.Buffer
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := master.Read(buf)
+			out.Write(buf[:n])
+			if err != nil {
+				return
+			}
+		}
+	}()
+	pid := cmd.Process.Pid
+	wait := func() syscall.WaitStatus {
+		var ws syscall.WaitStatus
+		done := make(chan struct{})
+		go func() { syscall.Wait4(pid, &ws, syscall.WUNTRACED, nil); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			syscall.Kill(pid, syscall.SIGKILL)
+			t.Fatalf("timed out, output %q", out.String())
+		}
+		return ws
+	}
+	if ws := wait(); ws&0xff != 0x7f {
+		t.Fatalf("the relay did not stop: status %#x, output %q", int(ws), out.String())
+	}
+	syscall.Kill(pid, syscall.SIGCONT)
+	if ws := wait(); !ws.Exited() || ws.ExitStatus() != 0 {
+		t.Fatalf("status %#x after continue, output %q", int(ws), out.String())
+	}
+	time.Sleep(200 * time.Millisecond)
+	if !strings.Contains(out.String(), "resumed") {
+		t.Fatalf("output %q", out.String())
+	}
+}
