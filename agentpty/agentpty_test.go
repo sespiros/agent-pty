@@ -159,3 +159,22 @@ func TestProcessRowsSeesThisProcess(t *testing.T) {
 	}
 	t.Fatal("this test binary is missing from ps")
 }
+
+func TestDirectRexOnlyWithoutAMultiplexer(t *testing.T) {
+	for _, k := range []string{"TMUX", "STY", "ZELLIJ"} {
+		t.Setenv(k, "")
+	}
+	t.Setenv("TERM_PROGRAM", "rex")
+	if !DirectRex() {
+		t.Error("plain Rex")
+	}
+	t.Setenv("STY", "123.session")
+	if DirectRex() {
+		t.Error("screen inside Rex")
+	}
+	t.Setenv("STY", "")
+	t.Setenv("TERM_PROGRAM", "ghostty")
+	if DirectRex() {
+		t.Error("not Rex")
+	}
+}

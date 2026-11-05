@@ -98,7 +98,7 @@ func status(args []string) int {
 		fmt.Fprintln(os.Stderr, "agent-pty: the report breaks the OSC 7501 grammar or limits:", err)
 		return 2
 	}
-	if agentpty.Nested() || os.Getenv("TERM_PROGRAM") == "rex" {
+	if agentpty.Nested() || agentpty.DirectRex() {
 		tty, err := os.OpenFile("/dev/tty", os.O_WRONLY|syscall.O_NOCTTY, 0)
 		if err != nil {
 			return 0

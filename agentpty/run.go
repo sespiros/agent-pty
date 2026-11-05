@@ -34,6 +34,23 @@ var ErrNotTerminal = errors.New("agentpty: stdin is not a terminal")
 // Nested reports whether this process already runs under a relay.
 func Nested() bool { return os.Getenv(ActiveEnv) == "1" }
 
+// DirectRex reports whether the terminal is Rex with no multiplexer in
+// between. Rex answers the probe and shows the reports itself. A
+// multiplexer started from Rex inherits TERM_PROGRAM=rex (screen keeps it;
+// tmux sets its own) but does not pass the probe through, so there the
+// relay is still needed.
+func DirectRex() bool {
+	if os.Getenv("TERM_PROGRAM") != "rex" {
+		return false
+	}
+	for _, k := range []string{"TMUX", "STY", "ZELLIJ"} {
+		if os.Getenv(k) != "" {
+			return false
+		}
+	}
+	return true
+}
+
 // Interactive reports whether stdin and stdout are terminals, which Run
 // needs.
 func Interactive() bool { return term.IsTerminal(0) && term.IsTerminal(1) }
