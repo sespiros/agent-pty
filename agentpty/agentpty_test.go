@@ -104,7 +104,7 @@ func TestSummarizeMapsRootAndChildren(t *testing.T) {
 	apply(t, store, "state=blocked:kind=permission:app=claude-code:msg=QWxsb3cgQmFzaDogbHM")
 	apply(t, store, "state=working:id=task1")
 	apply(t, store, "state=done:id=task2")
-	got := summarize(store, 2)
+	got := summarize(store, 2, "")
 	want := Status{State: "blocked", Kind: "permission", Msg: "Allow Bash: ls", App: "claude-code", Subagents: 1, Shells: 2}
 	if got != want {
 		t.Fatalf("got %+v want %+v", got, want)
@@ -117,7 +117,7 @@ func TestExitKeepsOnlyDoneAndError(t *testing.T) {
 		apply(t, store, "state="+state+":msg=cmVzdWx0")
 		apply(t, store, "state=working:id=task")
 		store.ProcessExited()
-		s := summarize(store, 0)
+		s := summarize(store, 0, "")
 		wantMsg := ""
 		if kept != "" {
 			wantMsg = "result"
@@ -176,5 +176,25 @@ func TestDirectRexOnlyWithoutAMultiplexer(t *testing.T) {
 	t.Setenv("TERM_PROGRAM", "ghostty")
 	if DirectRex() {
 		t.Error("not Rex")
+	}
+}
+
+func TestTitlesFindsTheLastWindowTitle(t *testing.T) {
+	var ts titles
+	if got, ok := ts.feed([]byte("a\x1b]0;Claude Code\x07b\x1b]2;my session\x1b\\c\x1b]7;file://x\x07")); !ok || got != "my session" {
+		t.Fatalf("got %q %v", got, ok)
+	}
+	data := []byte("x\x1b]2;split title\x07y")
+	var last string
+	for i := range data {
+		if got, ok := ts.feed(data[i : i+1]); ok {
+			last = got
+		}
+	}
+	if last != "split title" {
+		t.Fatalf("split: %q", last)
+	}
+	if _, ok := ts.feed([]byte("plain \x1b[1mbold\x1b[0m")); ok {
+		t.Fatal("no title in plain output")
 	}
 }

@@ -11,6 +11,10 @@ type Status struct {
 	App       string // the root record's app
 	Subagents int    // child records that are working or blocked
 	Shells    int    // background shells still running (Claude Code only)
+	// Title is the last window title the program set (OSC 0 or 2), not part
+	// of OSC 7501. What it holds is up to the program: Claude Code shows its
+	// session name there, others a directory or a spinner.
+	Title string
 }
 
 // Observer receives the status. Update runs on the relay's goroutine for
@@ -21,8 +25,8 @@ type Observer interface {
 	Close(Status)
 }
 
-func summarize(store *pst.Store, shells int) Status {
-	s := Status{Shells: shells}
+func summarize(store *pst.Store, shells int, title string) Status {
+	s := Status{Shells: shells, Title: title}
 	if root, ok := store.Get(""); ok {
 		s.State = string(root.State)
 		s.Kind = string(root.Kind)

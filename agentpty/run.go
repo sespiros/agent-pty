@@ -69,6 +69,8 @@ type relay struct {
 	master    *os.File
 	stub      int
 	scanner   scanner
+	titles    titles
+	title     string
 	store     *pst.Store
 	observers []Observer
 	last      Status
@@ -208,6 +210,10 @@ func (r *relay) wait(saved *syscall.Termios) int {
 
 func (r *relay) handle(data []byte) {
 	out, seqs := r.scanner.feed(data)
+	if t, ok := r.titles.feed(out); ok && t != r.title {
+		r.title = t
+		defer r.publish()
+	}
 	done := 0
 	for _, f := range seqs {
 		os.Stdout.Write(out[done:f.offset])
@@ -231,7 +237,7 @@ func (r *relay) handle(data []byte) {
 }
 
 func (r *relay) publish() {
-	s := summarize(r.store, r.shells)
+	s := summarize(r.store, r.shells, r.title)
 	if s == r.last {
 		return
 	}
@@ -266,7 +272,7 @@ func (r *relay) scan() {
 // finish applies the exit to the records and closes the observers.
 func (r *relay) finish(code int) int {
 	r.store.ProcessExited()
-	final := summarize(r.store, 0)
+	final := summarize(r.store, 0, r.title)
 	for _, o := range r.observers {
 		o.Close(final)
 	}

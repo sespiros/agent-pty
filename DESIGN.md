@@ -33,6 +33,7 @@ type Status struct {
     App       string // the root record's app
     Subagents int    // child records that are working or blocked
     Shells    int    // background shells still running (Claude Code only)
+    Title     string // the last window title the program set (OSC 0 or 2)
 }
 
 type Observer interface {
