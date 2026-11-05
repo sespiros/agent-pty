@@ -24,7 +24,6 @@ import (
 
 	"github.com/adamvduke/pst"
 	"github.com/sespiros/agent-pty/agentpty"
-	"github.com/sespiros/agent-pty/internal/term"
 	"github.com/sespiros/agent-pty/tmuxstatus"
 )
 
@@ -48,24 +47,16 @@ func run(argv []string) int {
 	}
 	pane := os.Getenv("TMUX_PANE")
 	if pane == "" || os.Getenv("TMUX") == "" || os.Getenv("AGENT_PTY") == "0" || agentpty.Nested() ||
-		!term.IsTerminal(0) || !term.IsTerminal(1) {
-		return direct(argv)
+		!agentpty.Interactive() {
+		err := agentpty.Exec(argv)
+		fmt.Fprintf(os.Stderr, "agent-pty: %s: %v\n", argv[0], err)
+		return 127
 	}
 	code, err := agentpty.Run(context.Background(), argv, tmuxstatus.New(pane))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "agent-pty:", err)
 	}
 	return code
-}
-
-// direct replaces this process with argv.
-func direct(argv []string) int {
-	path, err := exec.LookPath(argv[0])
-	if err == nil {
-		err = syscall.Exec(path, argv, os.Environ())
-	}
-	fmt.Fprintf(os.Stderr, "agent-pty: %s: %v\n", argv[0], err)
-	return 127
 }
 
 // clean removes control characters, which the protocol refuses, and cuts the

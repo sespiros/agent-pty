@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -32,6 +33,20 @@ var ErrNotTerminal = errors.New("agentpty: stdin is not a terminal")
 
 // Nested reports whether this process already runs under a relay.
 func Nested() bool { return os.Getenv(ActiveEnv) == "1" }
+
+// Interactive reports whether stdin and stdout are terminals, which Run
+// needs.
+func Interactive() bool { return term.IsTerminal(0) && term.IsTerminal(1) }
+
+// Exec replaces this process with argv, for callers that decide not to
+// relay. It returns only on failure.
+func Exec(argv []string) error {
+	path, err := exec.LookPath(argv[0])
+	if err != nil {
+		return err
+	}
+	return syscall.Exec(path, argv, os.Environ())
+}
 
 type relay struct {
 	master    *os.File
